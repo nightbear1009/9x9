@@ -14,6 +14,11 @@ export const SPEED_PRESETS = { slow: 170, normal: 220, fast: 280 };
 const SPEED_GROWTH = 1.05;    // 每關 +5%
 const SPEED_CAP = 1.6;        // 上限為所選檔位的 1.6 倍
 const WALL_SPACING = 990;     // 門間固定距離(普通檔位約 4.5 秒)
+
+// 練習模式(用點的):世界靜止等待點門,點了才開過去。不限思考時間、無金幣、無升級。
+const PRACTICE_DRIVE_SPEED = 420;  // 點門後的行駛動畫速度
+const PRACTICE_HOLD_Y = 230;       // 門停等的位置(題目膠囊下方)
+const PRACTICE_SPACING = 720;      // 門距(只影響換題動畫長度)
 const GATES_PER_LEVEL = 10;
 const CAR_Y = LOGICAL_H * 0.75;
 const LANE_TWEEN_SEC = 0.15;
@@ -37,7 +42,8 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 export class Game {
-  constructor({ canvas, questionEngine, upgrades, audio, ui, baseSpeed = SPEED_PRESETS.normal, rand = Math.random }) {
+  constructor({ canvas, questionEngine, upgrades, audio, ui, baseSpeed = SPEED_PRESETS.normal, practice = false, rand = Math.random }) {
+    this.practice = practice;
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.engine = questionEngine;
@@ -72,7 +78,8 @@ export class Game {
     this.coinItems = [];
     this.particles = [];
     this.nextQ = null;
-    this.distToWall = WALL_SPACING * 0.6; // 開場緩衝
+    this.driving = false; // 練習模式:是否正在開往選定的門
+    this.distToWall = this.practice ? 100 : WALL_SPACING * 0.6; // 開場緩衝
     this.dashOffset = 0;
     this.learnTimer = 0;
     this.ui.setScore(0);
@@ -116,14 +123,23 @@ export class Game {
 
   #handlePointer(e) {
     if (this.state !== 'running' && this.state !== 'learning') return;
+    if (this.practice && this.driving) return; // 開車中不能改選
     const rect = this.canvas.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * LOGICAL_W;
     this.targetLane = Math.max(0, Math.min(2, Math.floor((x - ROAD_X) / LANE_W)));
+    if (this.practice) this.#commitDrive();
   }
 
   #handleKey(e) {
     if (e.key === 'ArrowLeft') this.targetLane = Math.max(0, this.targetLane - 1);
     if (e.key === 'ArrowRight') this.targetLane = Math.min(2, this.targetLane + 1);
+    if (this.practice && (e.key === 'Enter' || e.key === ' ')) this.#commitDrive();
+  }
+
+  // 練習模式:只有門確實停好等待時,點擊才算出發(避免換題動畫中誤觸衝過未作答的門)
+  #commitDrive() {
+    const pending = this.walls.find((w) => !w.resolved);
+    if (pending && pending.y >= PRACTICE_HOLD_Y) this.driving = true;
   }
 
   // ---- 更新 ----
@@ -131,6 +147,14 @@ export class Game {
   #speed() {
     if (this.upgrades.slow) return this.baseSpeed;
     return this.baseSpeed * Math.min(SPEED_CAP, SPEED_GROWTH ** (this.level - 1));
+  }
+
+  // 練習模式的世界速度:門停在停等線且沒在開車 → 0(凍結,不限時思考)
+  // 其餘情況(門還在進場、或已點門出發)都以固定動畫速度前進
+  #practiceScroll() {
+    const pending = this.walls.find((w) => !w.resolved);
+    if (pending && pending.y >= PRACTICE_HOLD_Y && !this.driving) return 0;
+    return PRACTICE_DRIVE_SPEED;
   }
 
   #update(dt) {
@@ -146,7 +170,7 @@ export class Game {
         this.state = 'running';
       }
     }
-    const scroll = this.#speed() * scale * dt;
+    const scroll = (this.practice ? this.#practiceScroll() : this.#speed()) * scale * dt;
     this.dashOffset = (this.dashOffset + scroll) % 80;
 
     // 車道補間(碰撞以 targetLane 判定 — 對小朋友寬容:點了就算)
@@ -156,7 +180,7 @@ export class Game {
     this.distToWall -= scroll;
     if (this.distToWall <= 0) {
       this.#spawnWall();
-      this.distToWall += WALL_SPACING;
+      this.distToWall += this.practice ? PRACTICE_SPACING : WALL_SPACING;
     }
 
     for (const w of this.walls) w.y += scroll;
@@ -200,6 +224,7 @@ export class Game {
     this.nextQ = null;
     this.walls.push({ y: -60, q, resolved: false, hitLane: -1 });
     this.ui.setQuestion(`${q.a} × ${q.b} = ?`);
+    if (this.practice) return; // 練習模式無金幣
     // 門後方(較晚進畫面)的路段生金幣串
     const zigzag = this.rand() < 0.4;
     const count = 4 + Math.floor(this.rand() * 3);
@@ -214,6 +239,7 @@ export class Game {
     const q = w.q;
     const correct = w.hitLane === q.correctIndex;
     this.gatesPassed += 1;
+    if (this.practice) this.driving = false; // 通過後滑到下一題再停等
     this.engine.report(q, correct);
     if (correct) {
       this.combo += 1;
@@ -256,10 +282,18 @@ export class Game {
   #levelComplete() {
     this.gatesPassed = 0;
     this.level += 1;
-    this.upgrades.onLevelComplete(); // 先清單關效果,再抽新選項
-    this.state = 'upgrade';
     this.ui.setLevel(this.level);
     this.audio.levelUp();
+    if (this.practice) {
+      // 練習模式沒有升級三選一:慶祝 + 自動回復 1 顆愛心(借用學習時刻的暫停機制)
+      this.refillHeart();
+      this.state = 'learning';
+      this.learnTimer = 1.5;
+      this.ui.showLearning(`🎉 第 ${this.level} 關!`);
+      return;
+    }
+    this.upgrades.onLevelComplete(); // 先清單關效果,再抽新選項
+    this.state = 'upgrade';
     this.ui.levelComplete(this.level);
   }
 

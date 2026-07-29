@@ -36,8 +36,8 @@ h1 { font-size: 44px; }
 }
 .toggle.on { background: #2f6fed; border-color: #5b93ff; color: #fff; }
 
-#speed-toggles { display: flex; gap: 10px; }
-.toggle.speed { height: 52px; font-size: 18px; padding: 0 16px; }
+#speed-toggles { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 320px; }
+.toggle.speed { height: 52px; font-size: 18px; padding: 0 14px; }
 
 .btn-big {
   font-size: 28px; font-weight: 800; padding: 18px 56px;

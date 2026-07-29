@@ -108,6 +108,7 @@ renderToggles();
 
 // ---- 首頁:車速 ----
 const SPEED_OPTIONS = [
+  { id: 'tap', label: '🐣 用點的' },
   { id: 'slow', label: '🐢 慢慢開' },
   { id: 'normal', label: '🚗 普通' },
   { id: 'fast', label: '🚀 飆速' },
@@ -196,6 +197,7 @@ function startGame() {
   game = new Game({
     canvas: $('game-canvas'), questionEngine: engine, upgrades, audio, ui,
     baseSpeed: SPEED_PRESETS[settings.speed] ?? SPEED_PRESETS.slow,
+    practice: settings.speed === 'tap',
   });
   window.__game = game; // 自動化煙霧測試/除錯用
   show('screen-game');
