@@ -165,6 +165,7 @@ function startGame() {
   engine.report = (q, ok) => { origReport(q, ok); storage.saveReview(engine.getReviewState()); };
   upgrades = new UpgradeState();
   game = new Game({ canvas: $('game-canvas'), questionEngine: engine, upgrades, audio, ui });
+  window.__game = game; // 自動化煙霧測試/除錯用
   show('screen-game');
   game.start();
 }
