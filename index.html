@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>九九小車手</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<section id="screen-home" class="screen">
+  <h1>🏎️ 九九小車手</h1>
+  <p class="subtitle">開過寫著正確答案的門!</p>
+  <div class="panel">
+    <p class="panel-title">要練哪幾段?</p>
+    <div id="table-toggles"></div>
+  </div>
+  <button id="btn-start" class="btn-big">出發!</button>
+  <p id="home-highscore" class="muted"></p>
+  <button id="btn-mute" class="btn-small">🔊</button>
+</section>
+
+<section id="screen-game" class="screen hidden">
+  <div class="stage">
+    <canvas id="game-canvas"></canvas>
+    <div class="hud">
+      <div class="hud-top">
+        <span id="hud-hearts"></span>
+        <span id="hud-level"></span>
+        <span id="hud-score">0</span>
+      </div>
+      <div id="hud-question"></div>
+      <div class="hud-mid">
+        <span id="hud-combo"></span>
+        <span id="hud-shields"></span>
+      </div>
+    </div>
+    <div id="overlay-learning" class="overlay hidden">
+      <div id="learning-text"></div>
+    </div>
+    <div id="overlay-upgrade" class="overlay hidden">
+      <h2 id="upgrade-title"></h2>
+      <div id="upgrade-cards"></div>
+    </div>
+  </div>
+</section>
+
+<section id="screen-over" class="screen hidden">
+  <h1>💥 遊戲結束</h1>
+  <div class="panel stats">
+    <p>分數 <b id="over-score"></b></p>
+    <p>金幣 <b id="over-coins"></b></p>
+    <p>答對率 <b id="over-acc"></b></p>
+    <p class="muted">最高分 <b id="over-best"></b></p>
+  </div>
+  <button id="btn-again" class="btn-big">再玩一次</button>
+  <button id="btn-home" class="btn-small">回首頁</button>
+</section>
+
+<script type="module">
+import { QuestionEngine } from './js/questions.js';
+import { UpgradeState, HEART_REFILL } from './js/upgrades.js';
+import { createStorage, safeLocalStorage } from './js/storage.js';
+import { GameAudio } from './js/audio.js';
+import { Game } from './js/game.js';
+
+const $ = (id) => document.getElementById(id);
+const storage = createStorage(safeLocalStorage());
+const audio = new GameAudio();
+let settings = storage.loadSettings();
+let game = null;
+let upgrades = null;
+let engine = null;
+
+audio.setMuted(settings.muted);
+document.addEventListener('pointerdown', () => audio.unlock(), { once: true });
+
+// ---- 首頁:選段 ----
+function renderToggles() {
+  const box = $('table-toggles');
+  box.innerHTML = '';
+  for (let n = 1; n <= 9; n++) {
+    const b = document.createElement('button');
+    b.className = 'toggle' + (settings.tables.includes(n) ? ' on' : '');
+    b.textContent = n;
+    b.onclick = () => {
+      audio.click();
+      const i = settings.tables.indexOf(n);
+      if (i >= 0) { if (settings.tables.length > 1) settings.tables.splice(i, 1); }
+      else settings.tables.push(n);
+      settings.tables.sort((x, y) => x - y);
+      storage.saveSettings(settings);
+      renderToggles();
+    };
+    box.appendChild(b);
+  }
+}
+renderToggles();
+$('home-highscore').textContent = `最高分:${storage.loadHighScore()}`;
+
+$('btn-mute').onclick = () => {
+  settings.muted = !settings.muted;
+  audio.setMuted(settings.muted);
+  storage.saveSettings(settings);
+  $('btn-mute').textContent = settings.muted ? '🔇' : '🔊';
+};
+$('btn-mute').textContent = settings.muted ? '🔇' : '🔊';
+
+// ---- 畫面切換 ----
+function show(id) {
+  for (const s of ['screen-home', 'screen-game', 'screen-over']) $(s).classList.add('hidden');
+  $(id).classList.remove('hidden');
+}
+
+// ---- UI 契約(給 Game 呼叫)----
+const ui = {
+  setQuestion: (t) => { $('hud-question').textContent = t; },
+  setScore: (n) => { $('hud-score').textContent = n; },
+  setHearts: (n) => { $('hud-hearts').textContent = '❤️'.repeat(n) + '🖤'.repeat(Math.max(0, 3 - n)); },
+  setCombo: (n) => { $('hud-combo').textContent = n >= 2 ? `🔥 連擊 ×${Math.min(n, 5)}` : ''; },
+  setLevel: (n) => { $('hud-level').textContent = `第 ${n} 關`; },
+  setShields: (n) => { $('hud-shields').textContent = '🛡️'.repeat(n); },
+  showLearning: (t) => { $('learning-text').textContent = t; $('overlay-learning').classList.remove('hidden'); },
+  hideLearning: () => { $('overlay-learning').classList.add('hidden'); },
+  levelComplete: (level) => {
+    $('upgrade-title').textContent = `🎉 進入第 ${level} 關!選一個強化`;
+    const cards = $('upgrade-cards');
+    cards.innerHTML = '';
+    for (const c of upgrades.drawChoices()) {
+      const el = document.createElement('button');
+      el.className = 'card';
+      el.innerHTML = `<span class="card-emoji">${c.emoji}</span><span class="card-name">${c.name}</span><span class="card-desc">${c.desc}</span>`;
+      el.onclick = () => {
+        audio.click();
+        if (c.id === HEART_REFILL.id) game.refillHeart();
+        else upgrades.apply(c.id);
+        $('overlay-upgrade').classList.add('hidden');
+        game.resumeAfterUpgrade();
+      };
+      cards.appendChild(el);
+    }
+    $('overlay-upgrade').classList.remove('hidden');
+  },
+  gameOver: (stats) => {
+    const best = Math.max(stats.score, storage.loadHighScore());
+    storage.saveHighScore(best);
+    $('over-score').textContent = stats.score;
+    $('over-coins').textContent = stats.coins;
+    $('over-acc').textContent = stats.total ? `${Math.round(stats.correct / stats.total * 100)}%` : '—';
+    $('over-best').textContent = best;
+    game.destroy();
+    game = null;
+    show('screen-over');
+  },
+};
+
+// ---- 開始遊戲 ----
+function startGame() {
+  engine = new QuestionEngine({ tables: settings.tables, reviewState: storage.loadReview() });
+  const origReport = engine.report.bind(engine);
+  engine.report = (q, ok) => { origReport(q, ok); storage.saveReview(engine.getReviewState()); };
+  upgrades = new UpgradeState();
+  game = new Game({ canvas: $('game-canvas'), questionEngine: engine, upgrades, audio, ui });
+  show('screen-game');
+  game.start();
+}
+
+$('btn-start').onclick = () => { audio.unlock(); audio.click(); startGame(); };
+$('btn-again').onclick = () => { audio.click(); startGame(); };
+$('btn-home').onclick = () => {
+  audio.click();
+  $('home-highscore').textContent = `最高分:${storage.loadHighScore()}`;
+  show('screen-home');
+};
+
+// ---- PWA ----
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+</script>
+</body>
+</html>
