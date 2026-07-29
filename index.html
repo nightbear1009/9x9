@@ -20,6 +20,10 @@
     <p class="panel-title">要練哪幾段?</p>
     <div id="table-toggles"></div>
   </div>
+  <div class="panel">
+    <p class="panel-title">車速</p>
+    <div id="speed-toggles"></div>
+  </div>
   <button id="btn-start" class="btn-big">出發!</button>
   <p id="home-highscore" class="muted"></p>
   <button id="btn-mute" class="btn-small">🔊</button>
@@ -67,7 +71,7 @@ import { QuestionEngine } from './js/questions.js';
 import { UpgradeState, HEART_REFILL } from './js/upgrades.js';
 import { createStorage, safeLocalStorage } from './js/storage.js';
 import { GameAudio } from './js/audio.js';
-import { Game } from './js/game.js';
+import { Game, SPEED_PRESETS } from './js/game.js';
 
 const $ = (id) => document.getElementById(id);
 const storage = createStorage(safeLocalStorage());
@@ -101,6 +105,30 @@ function renderToggles() {
   }
 }
 renderToggles();
+
+// ---- 首頁:車速 ----
+const SPEED_OPTIONS = [
+  { id: 'slow', label: '🐢 慢慢開' },
+  { id: 'normal', label: '🚗 普通' },
+  { id: 'fast', label: '🚀 飆速' },
+];
+function renderSpeedToggles() {
+  const box = $('speed-toggles');
+  box.innerHTML = '';
+  for (const opt of SPEED_OPTIONS) {
+    const b = document.createElement('button');
+    b.className = 'toggle speed' + (settings.speed === opt.id ? ' on' : '');
+    b.textContent = opt.label;
+    b.onclick = () => {
+      audio.click();
+      settings.speed = opt.id;
+      storage.saveSettings(settings);
+      renderSpeedToggles();
+    };
+    box.appendChild(b);
+  }
+}
+renderSpeedToggles();
 $('home-highscore').textContent = `最高分:${storage.loadHighScore()}`;
 
 $('btn-mute').onclick = () => {
@@ -165,7 +193,10 @@ function startGame() {
   const origReport = engine.report.bind(engine);
   engine.report = (q, ok) => { origReport(q, ok); storage.saveReview(engine.getReviewState()); };
   upgrades = new UpgradeState();
-  game = new Game({ canvas: $('game-canvas'), questionEngine: engine, upgrades, audio, ui });
+  game = new Game({
+    canvas: $('game-canvas'), questionEngine: engine, upgrades, audio, ui,
+    baseSpeed: SPEED_PRESETS[settings.speed] ?? SPEED_PRESETS.slow,
+  });
   window.__game = game; // 自動化煙霧測試/除錯用
   show('screen-game');
   game.start();

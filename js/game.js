@@ -7,10 +7,13 @@ const LANE_COUNT = 3;
 const ROAD_X = 40;
 const ROAD_W = LOGICAL_W - ROAD_X * 2;
 const LANE_W = ROAD_W / LANE_COUNT;
-const BASE_SPEED = 220;                 // px/s,第一關
-const SPEED_GROWTH = 1.05;              // 每關 +5%
-const SPEED_CAP = 1.6;                  // 上限 1.6 倍
-const WALL_SPACING = BASE_SPEED * 4.5;  // 門間固定距離(基礎速度約 4.5 秒)
+// 首頁可選的初始速度檔位(px/s)。門距固定,所以檔位越慢思考時間越長:
+// 慢 ≈ 5.8 秒/門、普通 ≈ 4.5 秒/門、飆速 ≈ 3.5 秒/門
+export const SPEED_PRESETS = { slow: 170, normal: 220, fast: 280 };
+
+const SPEED_GROWTH = 1.05;    // 每關 +5%
+const SPEED_CAP = 1.6;        // 上限為所選檔位的 1.6 倍
+const WALL_SPACING = 990;     // 門間固定距離(普通檔位約 4.5 秒)
 const GATES_PER_LEVEL = 10;
 const CAR_Y = LOGICAL_H * 0.75;
 const LANE_TWEEN_SEC = 0.15;
@@ -34,13 +37,14 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 export class Game {
-  constructor({ canvas, questionEngine, upgrades, audio, ui, rand = Math.random }) {
+  constructor({ canvas, questionEngine, upgrades, audio, ui, baseSpeed = SPEED_PRESETS.normal, rand = Math.random }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.engine = questionEngine;
     this.upgrades = upgrades;
     this.audio = audio;
     this.ui = ui;
+    this.baseSpeed = baseSpeed;
     this.rand = rand;
     this.raf = 0;
     this.state = 'over';
@@ -125,8 +129,8 @@ export class Game {
   // ---- 更新 ----
 
   #speed() {
-    if (this.upgrades.slow) return BASE_SPEED;
-    return BASE_SPEED * Math.min(SPEED_CAP, SPEED_GROWTH ** (this.level - 1));
+    if (this.upgrades.slow) return this.baseSpeed;
+    return this.baseSpeed * Math.min(SPEED_CAP, SPEED_GROWTH ** (this.level - 1));
   }
 
   #update(dt) {

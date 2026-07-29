@@ -38,8 +38,10 @@ export function createStorage(backend) {
       return fallback;
     }
   };
+  const SETTINGS_DEFAULTS = { tables: [2, 3, 5], muted: false, speed: 'slow' };
   return {
-    loadSettings: () => load('99racer.settings', { tables: [2, 3, 5], muted: false }),
+    // 舊版存檔缺少新欄位時以預設值補齊(schema 演進)
+    loadSettings: () => ({ ...SETTINGS_DEFAULTS, ...load('99racer.settings', {}) }),
     saveSettings: (s) => set('99racer.settings', JSON.stringify(s)),
     loadHighScore: () => load('99racer.highscore', 0),
     saveHighScore: (n) => set('99racer.highscore', JSON.stringify(n)),

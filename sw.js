@@ -1,4 +1,4 @@
-const CACHE = '99racer-v2';
+const CACHE = '99racer-v3';
 const ASSETS = [
   './', './index.html', './style.css',
   './js/questions.js', './js/upgrades.js', './js/game.js', './js/audio.js', './js/storage.js',

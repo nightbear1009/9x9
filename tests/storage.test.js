@@ -13,7 +13,7 @@ function fakeBackend() {
 
 test('backend 為 null 時回傳預設值且可用記憶體讀寫', () => {
   const s = createStorage(null);
-  assert.deepEqual(s.loadSettings(), { tables: [2, 3, 5], muted: false });
+  assert.deepEqual(s.loadSettings(), { tables: [2, 3, 5], muted: false, speed: 'slow' });
   assert.equal(s.loadHighScore(), 0);
   assert.deepEqual(s.loadReview(), []);
   s.saveHighScore(1234);
@@ -23,11 +23,18 @@ test('backend 為 null 時回傳預設值且可用記憶體讀寫', () => {
 test('有 backend 時 roundtrip 正常', () => {
   const b = fakeBackend();
   const s = createStorage(b);
-  s.saveSettings({ tables: [7, 8], muted: true });
-  assert.deepEqual(s.loadSettings(), { tables: [7, 8], muted: true });
+  s.saveSettings({ tables: [7, 8], muted: true, speed: 'fast' });
+  assert.deepEqual(s.loadSettings(), { tables: [7, 8], muted: true, speed: 'fast' });
   s.saveReview([{ a: 3, b: 7, streak: 1, dueIn: 4 }]);
   assert.deepEqual(s.loadReview(), [{ a: 3, b: 7, streak: 1, dueIn: 4 }]);
   assert.ok(b.dump.has('99racer.settings'));
+});
+
+test('舊版存檔缺少新欄位時自動補預設值(schema 演進)', () => {
+  const b = fakeBackend();
+  b.setItem('99racer.settings', JSON.stringify({ tables: [7, 8], muted: true })); // v1 存檔,無 speed
+  const s = createStorage(b);
+  assert.deepEqual(s.loadSettings(), { tables: [7, 8], muted: true, speed: 'slow' });
 });
 
 test('backend 丟例外時退回記憶體,不 throw', () => {
@@ -43,5 +50,5 @@ test('JSON 壞掉時回傳預設值', () => {
   const b = fakeBackend();
   b.setItem('99racer.settings', '{oops');
   const s = createStorage(b);
-  assert.deepEqual(s.loadSettings(), { tables: [2, 3, 5], muted: false });
+  assert.deepEqual(s.loadSettings(), { tables: [2, 3, 5], muted: false, speed: 'slow' });
 });
