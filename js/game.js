@@ -8,8 +8,8 @@ const ROAD_X = 40;
 const ROAD_W = LOGICAL_W - ROAD_X * 2;
 const LANE_W = ROAD_W / LANE_COUNT;
 // 首頁可選的初始速度檔位(px/s)。門距固定,所以檔位越慢思考時間越長:
-// 慢 ≈ 5.8 秒/門、普通 ≈ 4.5 秒/門、飆速 ≈ 3.5 秒/門
-export const SPEED_PRESETS = { slow: 170, normal: 220, fast: 280 };
+// 慢 ≈ 5.8 秒/門、普通 ≈ 4.5 秒/門、飆速 ≈ 3.5 秒/門、超高速 ≈ 2.5 秒/門(頂速時 ≈ 1.5 秒,給大人玩)
+export const SPEED_PRESETS = { slow: 170, normal: 220, fast: 280, insane: 400 };
 
 const SPEED_GROWTH = 1.05;    // 每關 +5%
 const SPEED_CAP = 1.6;        // 上限為所選檔位的 1.6 倍

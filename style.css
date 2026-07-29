@@ -14,30 +14,33 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  padding: 24px;
+  gap: 14px;
+  padding: 16px;
   text-align: center;
+  overflow-y: auto;          /* 內容超過視窗時可捲動(小螢幕保險) */
+  touch-action: pan-y;
 }
+#screen-game { overflow: hidden; touch-action: none; }
 .hidden { display: none !important; }
-h1 { font-size: 44px; }
+h1 { font-size: 38px; }
 .subtitle { color: #aab3c5; font-size: 20px; }
 .muted { color: #7b8496; }
 
-.panel { background: #262b38; border-radius: 16px; padding: 20px 24px; }
-.panel-title { margin-bottom: 12px; font-size: 18px; color: #aab3c5; }
+.panel { background: #262b38; border-radius: 16px; padding: 14px 20px; }
+.panel-title { margin-bottom: 10px; font-size: 17px; color: #aab3c5; }
 .stats p { font-size: 22px; margin: 8px 0; }
 .stats b { font-size: 28px; color: #ffd34d; margin-left: 8px; }
 
-#table-toggles { display: grid; grid-template-columns: repeat(3, 72px); gap: 10px; }
+#table-toggles { display: grid; grid-template-columns: repeat(3, 72px); gap: 8px; }
 .toggle {
-  height: 64px; font-size: 28px; font-weight: 700;
+  height: 56px; font-size: 26px; font-weight: 700;
   border: 3px solid #3a4152; border-radius: 14px;
   background: #1f2430; color: #7b8496;
 }
 .toggle.on { background: #2f6fed; border-color: #5b93ff; color: #fff; }
 
-#speed-toggles { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 320px; }
-.toggle.speed { height: 52px; font-size: 18px; padding: 0 14px; }
+#speed-toggles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 380px; }
+.toggle.speed { height: 46px; font-size: 16px; padding: 0 12px; }
 
 .btn-big {
   font-size: 28px; font-weight: 800; padding: 18px 56px;
