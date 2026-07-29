@@ -7,10 +7,10 @@ const LANE_COUNT = 3;
 const ROAD_X = 40;
 const ROAD_W = LOGICAL_W - ROAD_X * 2;
 const LANE_W = ROAD_W / LANE_COUNT;
-const BASE_SPEED = 260;               // px/s,第一關
-const SPEED_GROWTH = 1.08;            // 每關 +8%
-const SPEED_CAP = 2;                  // 上限 2 倍
-const WALL_SPACING = BASE_SPEED * 4;  // 門間固定距離(基礎速度約 4 秒)
+const BASE_SPEED = 220;                 // px/s,第一關
+const SPEED_GROWTH = 1.05;              // 每關 +5%
+const SPEED_CAP = 1.6;                  // 上限 1.6 倍
+const WALL_SPACING = BASE_SPEED * 4.5;  // 門間固定距離(基礎速度約 4.5 秒)
 const GATES_PER_LEVEL = 10;
 const CAR_Y = LOGICAL_H * 0.75;
 const LANE_TWEEN_SEC = 0.15;
@@ -67,6 +67,7 @@ export class Game {
     this.walls = [];
     this.coinItems = [];
     this.particles = [];
+    this.nextQ = null;
     this.distToWall = WALL_SPACING * 0.6; // 開場緩衝
     this.dashOffset = 0;
     this.learnTimer = 0;
@@ -190,7 +191,9 @@ export class Game {
   }
 
   #spawnWall() {
-    const q = this.engine.next();
+    // 題目在前一排門結算時就已預告(#previewNext);這裡優先用預告過的題
+    const q = this.nextQ ?? this.engine.next();
+    this.nextQ = null;
     this.walls.push({ y: -60, q, resolved: false, hitLane: -1 });
     this.ui.setQuestion(`${q.a} × ${q.b} = ?`);
     // 門後方(較晚進畫面)的路段生金幣串
@@ -215,6 +218,7 @@ export class Game {
       this.ui.setCombo(this.combo);
       this.audio.correct();
       this.#burst(this.carX, CAR_Y - 60, '#7ce38b', 14);
+      this.#previewNext();
       if (this.gatesPassed >= GATES_PER_LEVEL) this.#levelComplete();
       return;
     }
@@ -235,7 +239,14 @@ export class Game {
     this.state = 'learning';
     this.learnTimer = LEARN_SEC;
     this.ui.showLearning(`${q.a} × ${q.b} = ${q.answer}`);
+    if (this.hearts > 0) this.#previewNext();
     if (this.gatesPassed >= GATES_PER_LEVEL) this.pendingLevelUp = true;
+  }
+
+  // 前一排門一結算就先顯示下一題,給足思考時間(約一整個門距)
+  #previewNext() {
+    this.nextQ = this.engine.next();
+    this.ui.setQuestion(`${this.nextQ.a} × ${this.nextQ.b} = ?`);
   }
 
   #levelComplete() {
