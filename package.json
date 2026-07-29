@@ -1,0 +1,6 @@
+{
+  "name": "9x9",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" }
+}
