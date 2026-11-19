@@ -194,7 +194,8 @@ function startGame() {
   engine = new QuestionEngine({ tables: settings.tables, reviewState: storage.loadReview() });
   const origReport = engine.report.bind(engine);
   engine.report = (q, ok) => { origReport(q, ok); storage.saveReview(engine.getReviewState()); };
-  upgrades = new UpgradeState();
+  // 「用點的」沒有車速與選道,慢速門與磁鐵沒有作用,不放進三選一
+  upgrades = new UpgradeState(Math.random, { exclude: settings.speed === 'tap' ? ['slow', 'magnet'] : [] });
   game = new Game({
     canvas: $('game-canvas'), questionEngine: engine, upgrades, audio, ui,
     baseSpeed: SPEED_PRESETS[settings.speed] ?? SPEED_PRESETS.slow,

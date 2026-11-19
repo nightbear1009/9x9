@@ -13,8 +13,10 @@ export const HEART_REFILL = { id: 'heart', emoji: '❤️', name: '愛心補給'
 const MAX_SHIELDS = 2;
 
 export class UpgradeState {
-  constructor(rand = Math.random) {
+  // exclude:這局不會抽到的強化 id(練習模式「用點的」沒有車速與選道,排除慢速門與磁鐵)
+  constructor(rand = Math.random, { exclude = [] } = {}) {
     this.rand = rand;
+    this.exclude = new Set(exclude);
     this.magnet = false;
     this.coinBonus = false;
     this.shields = 0;
@@ -23,10 +25,11 @@ export class UpgradeState {
   }
 
   drawChoices() {
-    const pool = [UPGRADES.double_score, UPGRADES.slow];
-    if (!this.magnet) pool.push(UPGRADES.magnet);
-    if (this.shields < MAX_SHIELDS) pool.push(UPGRADES.shield);
-    if (!this.coinBonus) pool.push(UPGRADES.coin_bonus);
+    const all = [UPGRADES.double_score, UPGRADES.slow];
+    if (!this.magnet) all.push(UPGRADES.magnet);
+    if (this.shields < MAX_SHIELDS) all.push(UPGRADES.shield);
+    if (!this.coinBonus) all.push(UPGRADES.coin_bonus);
+    const pool = all.filter((u) => !this.exclude.has(u.id));
     const choices = [];
     while (choices.length < 3 && pool.length > 0) {
       const i = Math.floor(this.rand() * pool.length);

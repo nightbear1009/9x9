@@ -58,3 +58,14 @@ test('UPGRADES 與 HEART_REFILL 中文文案齊備', () => {
   }
   assert.equal(HEART_REFILL.id, 'heart');
 });
+
+test('exclude:排除的強化不會被抽到', () => {
+  for (let seed = 0; seed < 50; seed++) {
+    let s = seed;
+    const rand = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+    const u = new UpgradeState(rand, { exclude: ['slow', 'magnet'] });
+    const ids = u.drawChoices().map((c) => c.id);
+    assert.equal(ids.length, 3);
+    assert.ok(!ids.includes('slow') && !ids.includes('magnet'), ids.join(','));
+  }
+});

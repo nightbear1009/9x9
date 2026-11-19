@@ -15,10 +15,12 @@ const SPEED_GROWTH = 1.05;    // 每關 +5%
 const SPEED_CAP = 1.6;        // 上限為所選檔位的 1.6 倍
 const WALL_SPACING = 990;     // 門間固定距離(普通檔位約 4.5 秒)
 
-// 練習模式(用點的):世界靜止等待點門,點了才開過去。不限思考時間、無金幣、無升級。
+// 練習模式(用點的):世界靜止等待點門,點了才開過去。不限思考時間。
+// 獎勵跟其他檔位一樣:答對後門後出金幣、每 10 道門選一個強化。
 const PRACTICE_DRIVE_SPEED = 420;  // 點門後的行駛動畫速度
 const PRACTICE_HOLD_Y = 230;       // 門停等的位置(題目膠囊下方)
 const PRACTICE_SPACING = 720;      // 門距(只影響換題動畫長度)
+const PRACTICE_COINS = 3;          // 答對後,在車子前方同一車道出的金幣數
 const GATES_PER_LEVEL = 10;
 const CAR_Y = LOGICAL_H * 0.75;
 const LANE_TWEEN_SEC = 0.15;
@@ -197,7 +199,7 @@ export class Game {
     const magnetRange = this.upgrades.magnet ? 1 : 0;
     for (const c of this.coinItems) {
       if (c.taken) continue;
-      if (Math.abs(c.y - CAR_Y) < 40 && Math.abs(c.lane - this.targetLane) <= magnetRange) {
+      if (Math.abs(c.y - CAR_Y) < 40 && (c.auto || Math.abs(c.lane - this.targetLane) <= magnetRange)) {
         c.taken = true;
         this.score += this.upgrades.coinValue();
         this.coins += 1;
@@ -224,7 +226,7 @@ export class Game {
     this.nextQ = null;
     this.walls.push({ y: -60, q, resolved: false, hitLane: -1 });
     this.ui.setQuestion(`${q.a} × ${q.b} = ?`);
-    if (this.practice) return; // 練習模式無金幣
+    if (this.practice) return; // 練習模式的金幣在答對後才出(見 #resolveWall),先出會洩漏答案
     // 門後方(較晚進畫面)的路段生金幣串
     const zigzag = this.rand() < 0.4;
     const count = 4 + Math.floor(this.rand() * 3);
@@ -248,6 +250,13 @@ export class Game {
       this.ui.setCombo(this.combo);
       this.audio.correct();
       this.#burst(this.carX, CAR_Y - 60, '#7ce38b', 14);
+      if (this.practice) {
+        // 答對獎勵:車子前方同一車道出一串金幣,換題滑行時自動吃到
+        // (auto:就算小朋友提早點了下一題的車道也照樣拿到,這是答對的獎勵)
+        for (let i = 0; i < PRACTICE_COINS; i++) {
+          this.coinItems.push({ lane: w.hitLane, y: CAR_Y - 130 - i * 70, taken: false, auto: true });
+        }
+      }
       this.#previewNext();
       if (this.gatesPassed >= GATES_PER_LEVEL) this.#levelComplete();
       return;
@@ -284,14 +293,7 @@ export class Game {
     this.level += 1;
     this.ui.setLevel(this.level);
     this.audio.levelUp();
-    if (this.practice) {
-      // 練習模式沒有升級三選一:慶祝 + 自動回復 1 顆愛心(借用學習時刻的暫停機制)
-      this.refillHeart();
-      this.state = 'learning';
-      this.learnTimer = 1.5;
-      this.ui.showLearning(`🎉 第 ${this.level} 關!`);
-      return;
-    }
+    if (this.practice) this.refillHeart(); // 練習模式過關多送 1 顆愛心,再照常三選一
     this.upgrades.onLevelComplete(); // 先清單關效果,再抽新選項
     this.state = 'upgrade';
     this.ui.levelComplete(this.level);
