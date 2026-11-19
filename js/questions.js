@@ -36,9 +36,12 @@ export class QuestionEngine {
 
   #gap() { return 3 + Math.floor(this.rand() * 3); } // 3..5 題後再出
 
+  // 只出勾選的段:未勾選段的複習項目保留在存檔裡(之後重新勾選時再複習),但這局不出、也不倒數
+  #active(r) { return this.tables.includes(r.a); }
+
   next() {
-    for (const r of this.review) if (r.dueIn !== SERVING) r.dueIn -= 1;
-    const due = this.review.find((r) => r.dueIn <= 0);
+    for (const r of this.review) if (r.dueIn !== SERVING && this.#active(r)) r.dueIn -= 1;
+    const due = this.review.find((r) => r.dueIn <= 0 && this.#active(r));
     let a, b, isReview;
     if (due) {
       a = due.a; b = due.b; isReview = true;

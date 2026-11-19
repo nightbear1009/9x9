@@ -51,9 +51,9 @@ test('答錯的題目會在 3~5 題內以複習題重新出現', () => {
   assert.ok(found >= 1 && found <= 5, `複習題出現在第 ${found} 題`);
 });
 
-test('複習題連對 2 次移出;中途答錯重置(複習題可來自未勾選的段)', () => {
-  // 複習項目 9×7 不在勾選的段 [2] 裡:上次練 9 的段留下的弱點,這次仍要複習
-  const e = new QuestionEngine({ tables: [2], reviewState: [{ a: 9, b: 7, streak: 0, dueIn: 1 }], rand: lcg(3) });
+test('複習題連對 2 次移出;中途答錯重置', () => {
+  // 複習項目 9×7 在勾選的段 [2, 9] 裡(沒勾選的段不出題,見下方測試)
+  const e = new QuestionEngine({ tables: [2, 9], reviewState: [{ a: 9, b: 7, streak: 0, dueIn: 1 }], rand: lcg(3) });
   const q1 = e.next();
   assert.ok(q1.isReview);
   assert.equal(q1.a, 9);
@@ -92,4 +92,26 @@ test('stats 累計答對/總數', () => {
   const a = e.next(); e.report(a, true);
   const b = e.next(); e.report(b, false);
   assert.deepEqual(e.stats, { correct: 1, total: 2 });
+});
+
+test('沒勾選的段不會從複習佇列出題,存檔仍保留', () => {
+  const reviewState = [
+    { a: 7, b: 8, streak: 0, dueIn: 1 },
+    { a: 9, b: 6, streak: 0, dueIn: 0 },
+  ];
+  const engine = new QuestionEngine({ tables: [2, 3], reviewState });
+  for (let i = 0; i < 200; i++) {
+    const q = engine.next();
+    assert.ok([2, 3].includes(q.a), `出了沒勾選的段:${q.a} × ${q.b}`);
+    engine.report(q, true);
+  }
+  const saved = engine.getReviewState();
+  assert.ok(saved.some((r) => r.a === 7 && r.b === 8));
+  assert.ok(saved.some((r) => r.a === 9 && r.b === 6));
+});
+
+test('重新勾選後,該段的複習題會再出現', () => {
+  const engine = new QuestionEngine({ tables: [7], reviewState: [{ a: 7, b: 8, streak: 0, dueIn: 1 }] });
+  const q = engine.next();
+  assert.deepEqual([q.a, q.b, q.isReview], [7, 8, true]);
 });
